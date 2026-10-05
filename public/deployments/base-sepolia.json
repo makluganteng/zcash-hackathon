@@ -1,0 +1,40 @@
+{
+  "chainId": 84532,
+  "deployer": "0xfcd9BA11F72b820041DF4bEadDCe96f20c834d1e",
+  "rpcUrl": "https://sepolia.base.org",
+  "registry": "0x61eaDB5e2609fdf05212a3921F7f847fa37C8cd2",
+  "verifier": "0x1C3Fb7aC0b4Eb0838e06934145080c78F9bEe051",
+  "contracts": [
+    {
+      "name": "AuctionVerifier.sol:RelationsLib",
+      "address": "0xe5Ac942c2ED47bc63A3f31E05608cA25b8507cDB",
+      "codeHash": "0x19c9d2109076d0e24872f3739155693d0ffc14e18a67d2af151cace983222828"
+    },
+    {
+      "name": "AuctionVerifier.sol:ZKTranscriptLib",
+      "address": "0xD5cB724F75A966107fBB20A6e3ef00610469481e",
+      "codeHash": "0xedacae9529e1447a4839986f7a5c5096a20ca3f5d0bc765f6f5df1fad6d0ece6"
+    },
+    {
+      "name": "AuctionVerifier.sol:HonkVerifier",
+      "address": "0x1C3Fb7aC0b4Eb0838e06934145080c78F9bEe051",
+      "codeHash": "0x226dc458a4112bbbdc96c10200de18e0164f8922731ce15990f3090d8933f4b6"
+    },
+    {
+      "name": "PrivateAuction.sol:PrivateAuction",
+      "address": "0x61eaDB5e2609fdf05212a3921F7f847fa37C8cd2",
+      "codeHash": "0x1ea7b8800a116fe82a85ada422f36f79d37f160c570eacaea78021b059373874"
+    }
+  ],
+  "circuitSourceHash": "0x891eeb9f933bcdfcfb4879732ad43ffe98fdfb06cf08f2577c48d75494b2243c",
+  "sourceHash": "0x7ec260ff4164f0e17a67eb0ccbad724e790fca191427d92858c1fa438b70c957",
+  "artifacts": {
+    "AuctionVerifier.sol:HonkVerifier": "0x91adcb67487e6b51a47b7321a7651d140198c4eb987589896052bd7dd6141e01",
+    "AuctionVerifier.sol:RelationsLib": "0x2021b9af72950ca27d1adfd7d1924f19e979ec66527230e7c1c6a39eab160c7c",
+    "AuctionVerifier.sol:ZKTranscriptLib": "0xf3edec12d67df816ac936101b74f3adbfbbb1ca9a808c6bc0ee38b97e90b4331",
+    "PrivateAuction.sol:PrivateAuction": "0x44a3e9818729b66e35163dc86341dab0e91df6f7e2c44050dacad9d712e2ee05"
+  },
+  "noir": "1.0.0-beta.22",
+  "barretenberg": "5.0.0-nightly.20260522",
+  "localOnly": false
+}
