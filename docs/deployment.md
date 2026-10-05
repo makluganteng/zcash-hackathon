@@ -3,9 +3,9 @@
 Updated October 6, 2026. The web app is published at
 [sealed-auctions.vercel.app](https://sealed-auctions.vercel.app).
 The hosted app is connected to the deployed Base Sepolia registry and Supabase.
-Auction configuration and receiver scanning are ready. The real shielded probe
-has been matched by the viewing-only scanner; the actual auction invoice payment
-is the remaining end-to-end validation step.
+The public testnet MVP is verified end to end: three hosted encrypted bids, a
+finalized real winner proof, winner-only invoice claiming, and the exact shielded
+invoice payment confirmed by the viewing-only receiver.
 
 ## Provisioned
 
@@ -182,8 +182,8 @@ in Porter fees plus cloud costs, and needs a host/cost decision before provision
 4. Attended local worker: running; an always-available cloud host remains unconfigured.
 5. Dedicated Zcash testnet receiver and supported viewing-only scanner: complete,
    including a real shielded probe and SDK-backed legacy/R2 address matching.
-6. Complete hosted bidding, proof verification, winner claim, and a real shielded
-   payment. Distinguish proof verification from receiver-observed payment status.
+6. Hosted bidding, independent proof verification, winner-only claim, and actual
+   shielded invoice settlement: complete for auction `2`.
 
 ## Compatible devtool receiver backend
 
@@ -224,3 +224,30 @@ its process environment. A dotenv value alone does not override an existing
 macOS `TMPDIR`. Stop the prior worker gracefully before starting another one;
 `.data/testnet/worker.pid` identifies this attended process. Keep this Mac awake
 for the demo. A persistent cloud worker has not been provisioned.
+
+## Verified public end-to-end run
+
+On October 6, 2026 (Asia/Jakarta), [auction 2](https://sealed-auctions.vercel.app/auctions/2)
+completed the real public-network path. Three independently signed, time-locked
+encrypted bids were registered through the hosted API. The immutable verifier
+accepted a 9,536-byte proof with 57 public inputs. The 3,000,000-zatoshi bid won
+at insertion index 1. The separate observer CLI checked runtime hashes, canonical
+registry inputs, and the cryptographic proof at finalized Base block `47731741`.
+
+The losing identity received HTTP 403 when attempting to claim. The winning
+identity signed a fresh challenge and received a signature-validated invoice.
+The dedicated payer sent exactly **0.03 TAZ** with its exact private memo to the
+committed seller destination. The UFVK-only receiver matched one Ironwood output
+and the authenticated invoice API returned **receiver-confirmed**, with at least
+three confirmations. No database row was manually marked paid.
+
+Invoice tokens, memos, signing identities and private wallet material remain in
+ignored owner-only local files. Detailed receipt evidence is also kept out of
+Git and web uploads. Public winner proof data is available from the app.
+
+Latest hosted build: `dpl_B7UD9xszowzVVQ65wQ9of31b4gUE`. TypeScript, ESLint,
+46 application tests, 13 exporter tests, and six SDK binding tests passed. Two
+opt-in application integration suites remain skipped in the default test command;
+this public end-to-end run was performed separately. GitHub hosted-runner delays
+affected the independent helper CI run; its local build and real receipt checks
+passed. The active worker is still an attended process on this Mac.

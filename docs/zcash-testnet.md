@@ -1,6 +1,6 @@
 # Dedicated Zcash testnet wallets
 
-## Current state: NU7 scanning and receiver binding work; invoice settlement is pending
+## Current state: public auction invoice settlement verified
 
 A custom build using the official NU7 prerelease wallet crates passed [hosted compilation, protocol tests and real testnet scanning](https://github.com/makluganteng/zcash-hackathon/actions/runs/37362246450). The existing dedicated sender and seller were restored into separate directories, and a separate UFVK-only receiver was imported. The new SDK re-encodes viewing keys and addresses as ZIP 316 Revision 2; canonicalized original viewing keys match the restored accounts exactly.
 
@@ -15,6 +15,10 @@ A private 512 MiB RAM volume was used temporarily when persistent storage could 
 The address verifier is `.tools/zcash-nu7/sealed-address-bindings`, SHA-256 `a31963ba1021f6ce158190216de9adf310ede5418c460501005d0fb609fcd3c9`. It was built locally with Rust 1.94 after sufficient disk headroom returned; all selected dependency versions are a subset of the verified wallet's lockfile. Local build/test logs are in `.data/zcash-nu7/build-evidence/`. The [ARM helper CI attempt](https://github.com/makluganteng/zcash-hackathon/actions/runs/37367479799) never obtained a runner during GitHub's [scheduling incident](https://www.githubstatus.com/incidents/3q1yb5m7ltvb); this was an infrastructure failure, not a test failure. A single [standard Intel macOS fallback](https://github.com/makluganteng/zcash-hackathon/actions/runs/37369290208) was queued for independent verification. The active runtime remains the locally verified ARM binary.
 
 The helper emits pool-specific `destinationBindings`, and the exporter adds original/canonical destination spellings only after official SDK ownership verification. The persisted account UUID is `f3a41573-8851-45f4-93ca-bb70efc56fc4`. Both the helper and exporter reject seeded scanner accounts. The worker now owns scanner synchronization; manual wallet mutation must be coordinated with it.
+
+The actual winner invoice for public auction `2` subsequently settled: exactly **0.03 TAZ**, the exact private invoice memo, one Ironwood output, and at least three receiver-observed confirmations. The authenticated hosted invoice API returned `receiver-confirmed`; the database was not manually changed to report payment. The separate probe above remains distinct from this invoice settlement.
+
+An independent review also found and closed a missing-recipient edge case. Incoming non-change notes with unknown scope or recipient now reject the complete export, rather than being hidden as internal transfers. All 13 exporter regression tests pass, including a valid payment beside an unresolved second note.
 
 The pinned scanner supports **native ZEC/TAZ only**: `orchard 0.16` notes contain a scalar `NoteValue`, and `zcash_client_sqlite 0.23.0-pre.0`'s Ironwood received-note schema has no asset identifier. [NU7's deployment specification](https://zips.z.cash/zip-0259) adds no asset-bearing transaction format. The dependency pin is part of this guarantee; a future asset-capable SDK/schema requires explicit denomination validation before integration.
 

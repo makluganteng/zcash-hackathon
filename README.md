@@ -4,7 +4,7 @@ Private first-price auctions with a verifiable winner and shielded Zcash settlem
 Next.js on Vercel hosts the interface; an immutable EVM registry records bids and
 verifies a real Noir proof; a separate worker opens bids and monitors the receiver.
 
-**Public testnet app: [sealed-auctions.vercel.app](https://sealed-auctions.vercel.app).** Supabase and the deployed Base Sepolia registry/verifier are connected. The full auction flow is verified locally; hosted end-to-end validation and an actual Zcash receipt are in progress. The app never substitutes a mock proof or payment confirmation when an integration is missing. It has not been audited. See [deployment status](docs/deployment.md) and [Zcash testnet compatibility](docs/zcash-testnet.md).
+**Public testnet app: [sealed-auctions.vercel.app](https://sealed-auctions.vercel.app).** Supabase and the deployed Base Sepolia registry/verifier are connected. The hosted flow is verified end to end: [auction 2](https://sealed-auctions.vercel.app/auctions/2) registered three encrypted bids, finalized a real winner proof, rejected a losing claimant, issued the winner’s signed invoice, and confirmed its exact 0.03 TAZ shielded payment through the viewing-only receiver. The app never substitutes a mock proof or payment confirmation when an integration is missing. It has not been audited. See [deployment status](docs/deployment.md) and [Zcash testnet compatibility](docs/zcash-testnet.md).
 
 ## What works
 
