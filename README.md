@@ -1,0 +1,2 @@
+# zcash-hackathon
+zcash hackathon
