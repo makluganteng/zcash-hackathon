@@ -248,6 +248,7 @@ Git and web uploads. Public winner proof data is available from the app.
 Latest hosted build: `dpl_B7UD9xszowzVVQ65wQ9of31b4gUE`. TypeScript, ESLint,
 46 application tests, 13 exporter tests, and six SDK binding tests passed. Two
 opt-in application integration suites remain skipped in the default test command;
-this public end-to-end run was performed separately. GitHub hosted-runner delays
-affected the independent helper CI run; its local build and real receipt checks
-passed. The active worker is still an attended process on this Mac.
+this public end-to-end run was performed separately. The independent hosted receiver CI
+also passed ([run 37370344042](https://github.com/makluganteng/zcash-hackathon/actions/runs/37370344042))
+after the standard Intel runner fallback. The active worker is still an attended
+process on this Mac.
