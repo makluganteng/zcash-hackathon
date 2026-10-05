@@ -29,7 +29,17 @@ with its real pool and output/action index; no amount aggregation or fabricated
 recipient data. Spent received notes are retained by querying the upstream
 received-output view rather than an unspent list.
 
-Nine isolated SQLite fixture tests cover identity, memo, amount, recipient,
+Ten isolated SQLite fixture tests cover identity, memo, amount, recipient,
 multiple outputs, reorgs and failure conditions. Those fixtures are not live
 payment evidence. CI also exercises a real freshly generated UFVK-only wallet
-with no funds; a funded local test is still required before enabling payments.
+with no funds; those checks do not replace a funded local test before enabling
+payments. Current live evidence is recorded in `docs/zcash-testnet.md`.
+
+`address-bindings/` is a small read-only helper using the same SDK/dependency
+versions as the verified wallet. It proves external UFVK ownership, re-encodes
+legacy addresses with the official library, and matches receiver objects per
+shielded pool. Its six tests reject foreign receivers, wrong networks, internal
+scope and mismatched diversifiers, and verify legacy encoding and pool isolation.
+The exporter accepts `--address-verifier` and `--destination` to produce verified
+pool-specific `destinationBindings`; the same stored UA's unrelated Sapling
+receiver is never authorized by an Orchard-only destination.

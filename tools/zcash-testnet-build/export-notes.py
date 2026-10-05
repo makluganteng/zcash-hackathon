@@ -6,6 +6,7 @@ transaction records used by Sealed, but this is not a Zallet RPC server.
 """
 import argparse
 import json
+import os
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -103,6 +104,7 @@ def snapshot(db, config, required_height):
 
 
 def cli():
+    os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary', required=True, type=Path)
     parser.add_argument('--wallet', required=True, type=Path)
