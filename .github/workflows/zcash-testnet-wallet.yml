@@ -1,0 +1,195 @@
+name: Build NU7 testnet wallet
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/zcash-nu7-build]
+    paths:
+      - tools/zcash-testnet-build/**
+      - .github/workflows/zcash-testnet-wallet.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zcash-testnet-wallet
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      wallet: ${{ steps.scope.outputs.wallet }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          python3 - <<'PY'
+          import os,subprocess
+          wallet = os.environ['EVENT_NAME'] != 'push'
+          if not wallet:
+              before=os.environ['BEFORE_SHA']
+              if not before or set(before)=={'0'}:
+                  wallet=True
+              else:
+                  files=set(subprocess.check_output(['git','diff','--name-only',before,'HEAD'],text=True).splitlines())
+                  wallet=bool(files & {'tools/zcash-testnet-build/main.rs','tools/zcash-testnet-build/prepare.py'})
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f: f.write('wallet='+str(wallet).lower()+'\n')
+          PY
+  build:
+    needs: changes
+    if: needs.changes.outputs.wallet == 'true'
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_RELEASE_DEBUG: '0'
+      UPSTREAM_REV: 5a26ee854e634a4e88d1d79dab13f8fbb1eac6b8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check platform and fetch pinned upstream
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          rustup update stable --no-self-update
+          brew list protobuf >/dev/null 2>&1 || brew install protobuf
+          mkdir -p "$RUNNER_TEMP/nu7-wallet" "$RUNNER_TEMP/nu7-artifact"
+          git -C "$RUNNER_TEMP/nu7-wallet" init
+          git -C "$RUNNER_TEMP/nu7-wallet" remote add origin https://github.com/zcash/zcash-devtool.git
+          git -C "$RUNNER_TEMP/nu7-wallet" fetch --depth 1 origin "$UPSTREAM_REV"
+          git -C "$RUNNER_TEMP/nu7-wallet" checkout --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/nu7-wallet" rev-parse HEAD)" = "$UPSTREAM_REV"
+      - name: Verify exact-note exporter fixtures
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/zcash-testnet-build -p 'test_*.py'
+      - name: Apply reviewed source overlay
+        run: python3 tools/zcash-testnet-build/prepare.py "$RUNNER_TEMP/nu7-wallet"
+      - name: Resolve and check
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/nu7-wallet"
+          cargo +stable generate-lockfile 2>&1 | tee "$RUNNER_TEMP/nu7-artifact/resolve.log"
+          cargo +stable check --locked --message-format short 2>&1 | tee "$RUNNER_TEMP/nu7-artifact/check.log"
+      - name: Verify protocol support and build
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/nu7-wallet"
+          cargo +stable test --locked protocol_tests::nu7_public_testnet_consensus_is_supported 2>&1 | tee "$RUNNER_TEMP/nu7-artifact/test.log"
+          cargo +stable build --release --locked 2>&1 | tee "$RUNNER_TEMP/nu7-artifact/build.log"
+      - name: Smoke test with a fresh unfunded wallet
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          cd "$RUNNER_TEMP/nu7-wallet"
+          mkdir "$RUNNER_TEMP/nu7-smoke"
+          ./target/release/zcash-devtool wallet -w "$RUNNER_TEMP/nu7-smoke" init --name 'Unfunded CI smoke' -n test -i "$RUNNER_TEMP/nu7-smoke/identity.txt" -s zecrocks
+          ./target/release/zcash-devtool wallet -w "$RUNNER_TEMP/nu7-smoke" get-info -s zecrocks > "$RUNNER_TEMP/nu7-artifact/server-info.json"
+          ./target/release/zcash-devtool wallet -w "$RUNNER_TEMP/nu7-smoke" sync -s zecrocks
+          ./target/release/zcash-devtool wallet -w "$RUNNER_TEMP/nu7-smoke" balance --json > "$RUNNER_TEMP/nu7-artifact/balance.json"
+          python3 -c 'import json,os; p=os.environ["RUNNER_TEMP"]+"/nu7-artifact/server-info.json"; j=json.load(open(p)); assert j["chain_name"] == "test" and j["chain_tip_height"] >= 4465026'
+      - name: Smoke test an isolated viewing-only scanner
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          python3 - <<'PY'
+          import os,sqlite3,subprocess
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])
+          binary=root/'nu7-wallet/target/release/zcash-devtool'
+          scanner=root/'nu7-view-smoke'
+          scanner.mkdir(mode=0o700)
+          with sqlite3.connect('file:'+str(root/'nu7-smoke/data.sqlite')+'?mode=ro',uri=True) as db:
+              key,birthday=db.execute('SELECT ufvk,birthday_height FROM accounts').fetchone()
+          subprocess.run([str(binary),'wallet','-w',str(scanner),'init-fvk','--name','Unfunded view-only CI smoke','--fvk',key,'--birthday',str(birthday),'-s','zecrocks'],check=True,capture_output=True)
+          PY
+          python3 tools/zcash-testnet-build/export-notes.py --binary "$RUNNER_TEMP/nu7-wallet/target/release/zcash-devtool" --wallet "$RUNNER_TEMP/nu7-view-smoke" > "$RUNNER_TEMP/nu7-artifact/scan-smoke.json"
+      - name: Package binary and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$RUNNER_TEMP/nu7-wallet/target/release/zcash-devtool" "$RUNNER_TEMP/nu7-artifact/sealed-zcash-testnet"
+          cp "$RUNNER_TEMP/nu7-wallet/Cargo.lock" "$RUNNER_TEMP/nu7-artifact/Cargo.lock"
+          python3 - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          p=Path(os.environ['RUNNER_TEMP'])/'nu7-artifact'
+          (p/'build-info.json').write_text(json.dumps({'upstream':os.environ['UPSTREAM_REV'],'overlay':os.environ['GITHUB_SHA'],'architecture':subprocess.check_output(['uname','-m'],text=True).strip(),'rust':subprocess.check_output(['rustc','+stable','--version'],text=True).strip()},indent=2))
+          PY
+          cd "$RUNNER_TEMP/nu7-artifact"
+          shasum -a 256 sealed-zcash-testnet Cargo.lock build-info.json > SHA256SUMS
+      - name: Upload verified executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: sealed-zcash-testnet-macos-arm64
+          path: |
+            ${{ runner.temp }}/nu7-artifact/sealed-zcash-testnet
+            ${{ runner.temp }}/nu7-artifact/Cargo.lock
+            ${{ runner.temp }}/nu7-artifact/build-info.json
+            ${{ runner.temp }}/nu7-artifact/SHA256SUMS
+            ${{ runner.temp }}/nu7-artifact/server-info.json
+            ${{ runner.temp }}/nu7-artifact/balance.json
+            ${{ runner.temp }}/nu7-artifact/scan-smoke.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nu7-wallet-build-diagnostics
+          path: ${{ runner.temp }}/nu7-artifact/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+  address-bindings:
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    env:
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_RELEASE_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify platform and note-export fixtures
+        run: |
+          test "$(uname -m)" = x86_64
+          rustup update stable --no-self-update
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/zcash-testnet-build -p 'test_*.py'
+      - name: Test official SDK address ownership and pool binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +stable test --release --manifest-path tools/zcash-testnet-build/address-bindings/Cargo.toml 2>&1 | tee "$RUNNER_TEMP/address-binding-tests.log"
+          cargo +stable build --release --locked --manifest-path tools/zcash-testnet-build/address-bindings/Cargo.toml 2>&1 | tee "$RUNNER_TEMP/address-binding-build.log"
+      - name: Package verified helper
+        run: |
+          mkdir "$RUNNER_TEMP/address-binding-artifact"
+          cp tools/zcash-testnet-build/address-bindings/target/release/sealed-address-bindings "$RUNNER_TEMP/address-binding-artifact/"
+          cp tools/zcash-testnet-build/address-bindings/Cargo.lock "$RUNNER_TEMP/address-binding-artifact/"
+          cd "$RUNNER_TEMP/address-binding-artifact"
+          shasum -a 256 sealed-address-bindings Cargo.lock > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sealed-address-bindings-macos-x86_64
+          path: ${{ runner.temp }}/address-binding-artifact/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload helper diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: address-binding-diagnostics
+          path: ${{ runner.temp }}/address-binding-*.log
+          if-no-files-found: ignore
+          retention-days: 7

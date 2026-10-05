@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: auction_dev
+      POSTGRES_PASSWORD: local-development-only
+      POSTGRES_DB: sealed_auctions
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - auction_database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auction_dev -d sealed_auctions"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  auction_database:

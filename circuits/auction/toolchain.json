@@ -1,0 +1,11 @@
+{
+  "noir": "1.0.0-beta.22",
+  "barretenberg": "5.0.0-nightly.20260522",
+  "sha256Library": "v0.3.0",
+  "solc": "0.8.30",
+  "verifierTarget": "evm",
+  "publicInputCount": 57,
+  "verificationKeySha256": "04d6c11049da09188f802841afbe556621d81ec2654077522e52cc5b3792de55",
+  "verificationKeyHash": "0x0d8860979c074a8dc106189e27d6fc29c099e35d1659208db7b200dd412e147d",
+  "verifierSourceSha256": "7e2414315aeb5c89920fe2644165c4d595f76b45fc9ece31c7e3b48a0481c4e7"
+}

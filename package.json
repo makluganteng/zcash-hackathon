@@ -1,0 +1,50 @@
+{
+  "name": "sealed-auctions",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "node scripts/test.mjs",
+    "worker": "tsx --env-file=.env.worker.local scripts/worker.ts",
+    "db:migrate": "tsx --env-file=.env.local scripts/db-migrate.ts",
+    "keys:generate": "tsx scripts/generate-keys.ts",
+    "test:crypto:live": "tsx scripts/crypto-spike.ts",
+    "proof:setup": "bash scripts/proof-setup.sh",
+    "test:proof": "python3 scripts/proof-tests.py",
+    "test:contracts": "forge test --root contracts",
+    "test:chain": "tsx scripts/contract-smoke.ts",
+    "chain:deploy:local": "tsx scripts/contract-deploy.ts",
+    "chain:deploy:base": "tsx scripts/contract-deploy-base.ts",
+    "auction:local": "tsx --env-file=.env.local scripts/local-auction.ts",
+    "verify": "tsx scripts/proof-verify.ts",
+    "proof:build": "bash scripts/proof-build.sh"
+  },
+  "dependencies": {
+    "next": "16.3.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "viem": "2.57.3",
+    "tlock-js": "0.9.0",
+    "drand-client": "1.4.2",
+    "pg": "8.23.1",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "tsx": "^4.21.0",
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/pg": "^8.15.6",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "16.3.8"
+  }
+}

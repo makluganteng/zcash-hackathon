@@ -1,0 +1,16 @@
+.env*
+**/__pycache__/**
+**/*.pyc
+.data/
+.local/
+.secrets/
+.tools/
+.omx/evidence/
+.omx/state/
+.omx/logs/
+.omx/notepad.md
+.omx/project-memory.json
+contracts/out/
+contracts/cache/
+circuits/auction/target/
+circuits/auction/Prover.toml
