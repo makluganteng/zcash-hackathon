@@ -16,14 +16,14 @@ class NoteSnapshotTests(unittest.TestCase):
         CREATE TABLE scan_queue(priority INTEGER);
         CREATE TABLE blocks(height INTEGER,hash BLOB,time INTEGER);
         CREATE TABLE transactions(id_tx INTEGER,txid BLOB,mined_height INTEGER,expiry_height INTEGER);
-        CREATE TABLE addresses(id INTEGER,address TEXT,key_scope INTEGER);
+        CREATE TABLE addresses(id INTEGER,address TEXT,key_scope INTEGER,account_id INTEGER,receiver_flags INTEGER);
         CREATE TABLE v_received_outputs(transaction_id INTEGER,account_id INTEGER,address_id INTEGER,pool INTEGER,output_index INTEGER,value INTEGER,memo BLOB,is_change INTEGER,sent_note_id INTEGER);
         ''')
         self.db.execute('INSERT INTO accounts VALUES(1,?,1,NULL,NULL)', (bytes(range(16)),))
         self.db.execute('INSERT INTO blocks VALUES(4465030,?,1000)', (bytes(range(32)),))
         self.db.execute('INSERT INTO blocks VALUES(4465032,?,1050)', (bytes(range(32)),))
         self.db.execute('INSERT INTO transactions VALUES(1,?,4465030,4465050)', (bytes(range(32)),))
-        self.db.execute("INSERT INTO addresses VALUES(1,'utest1fixture',0)")
+        self.db.execute("INSERT INTO addresses VALUES(1,'utest1fixture',0,1,8)")
         self.db.execute('INSERT INTO v_received_outputs VALUES(1,1,1,4,7,500000,?,0,NULL)', (b'invoice-123'+bytes(501),))
         self.config = {'network': 'test'}
 
@@ -46,6 +46,12 @@ class NoteSnapshotTests(unittest.TestCase):
     def test_two_notes_remain_two_outputs_and_cannot_be_aggregated(self):
         self.db.execute('INSERT INTO v_received_outputs VALUES(1,1,1,4,8,1,?,0,NULL)', (b'invoice-123',))
         self.assertEqual(len(self.read()['transactions'][0]['outputs']), 2)
+
+    def test_owned_addresses_exclude_internal_and_transparent_destinations(self):
+        self.db.execute("INSERT INTO addresses VALUES(2,'utest1internal',1,1,8)")
+        self.db.execute("INSERT INTO addresses VALUES(3,'tmTransparent',0,1,1)")
+        self.db.execute('DELETE FROM v_received_outputs')
+        self.assertEqual(self.read()['receivingAddresses'], ['utest1fixture'])
 
     def test_missing_address_remains_unmatchable(self):
         self.db.execute('UPDATE v_received_outputs SET address_id=NULL')

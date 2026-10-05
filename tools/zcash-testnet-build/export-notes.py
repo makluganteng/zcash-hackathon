@@ -30,6 +30,12 @@ def snapshot(db, config, required_height):
     """All queries use one read transaction after successful upstream sync."""
     db.row_factory = sqlite3.Row
     account = require_view_only(db, config)
+    # Upstream ReceiverFlags uses bit 2 for Sapling and bit 3 for Orchard.
+    # Include only externally scoped shielded destinations stored for this account.
+    receiving_addresses = [row[0] for row in db.execute('''
+        SELECT DISTINCT a.address FROM addresses a JOIN accounts ac ON ac.id=a.account_id
+        WHERE a.key_scope=0 AND (a.receiver_flags & 12) != 0 ORDER BY a.address
+    ''')]
     if db.execute('SELECT COUNT(*) FROM scan_queue WHERE priority > 10').fetchone()[0]:
         raise ValueError('Wallet still has unscanned or unverified ranges')
     tip = db.execute('SELECT MAX(height) FROM blocks').fetchone()[0]
@@ -90,7 +96,8 @@ def snapshot(db, config, required_height):
                 except UnicodeDecodeError as error:
                     raise ValueError('Invalid UTF-8 text memo') from error
         tx['outputs'].append(output)
-    return {'network': 'test', 'accountUuid': account, 'scannedHeight': tip,
+    return {'network': 'test', 'accountUuid': account, 'receivingAddresses': receiving_addresses,
+            'scannedHeight': tip,
             'serverTargetHeight': required_height, 'observedAt': int(time.time()),
             'transactions': list(transactions.values())}
 
@@ -99,6 +106,8 @@ def cli():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary', required=True, type=Path)
     parser.add_argument('--wallet', required=True, type=Path)
+    parser.add_argument('--address-verifier', type=Path)
+    parser.add_argument('--destination', action='append', default=[])
     args = parser.parse_args()
     binary = args.binary.resolve(strict=True)
     wallet = args.wallet.resolve(strict=True)
@@ -122,6 +131,22 @@ def cli():
     with sqlite3.connect(uri, uri=True) as db:
         db.execute('BEGIN')
         value = snapshot(db, config, info['chain_tip_height'])
+    value['destinationBindings'] = []
+    if args.destination and not args.address_verifier:
+        raise ValueError('Destination ownership requires the official SDK address verifier')
+    for destination in sorted(set(args.destination)):
+        result = subprocess.run([str(args.address_verifier.resolve(strict=True)), '--wallet', str(wallet),
+                                 '--address', destination], capture_output=True, text=True, timeout=30)
+        if result.returncode:
+            raise ValueError('Official SDK could not verify destination ownership')
+        binding = json.loads(result.stdout)
+        if (binding.get('bindingVersion') != 1 or binding.get('network') != 'test'
+                or binding.get('accountUuid') != value['accountUuid']
+                or binding.get('destination') != destination):
+            raise ValueError('Address verifier returned a mismatched account or destination')
+        value['destinationBindings'].append({'destination': destination, 'receivers': binding['receivers']})
+        value['receivingAddresses'] = sorted(set(value['receivingAddresses'] +
+                                                 [destination, binding['canonicalDestination']]))
     print(json.dumps(value))
 
 

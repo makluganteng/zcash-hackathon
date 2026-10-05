@@ -16,7 +16,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      wallet: ${{ steps.scope.outputs.wallet }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          python3 - <<'PY'
+          import os,subprocess
+          wallet = os.environ['EVENT_NAME'] != 'push'
+          if not wallet:
+              before=os.environ['BEFORE_SHA']
+              if not before or set(before)=={'0'}:
+                  wallet=True
+              else:
+                  files=set(subprocess.check_output(['git','diff','--name-only',before,'HEAD'],text=True).splitlines())
+                  wallet=bool(files & {'tools/zcash-testnet-build/main.rs','tools/zcash-testnet-build/prepare.py'})
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f: f.write('wallet='+str(wallet).lower()+'\n')
+          PY
   build:
+    needs: changes
+    if: needs.changes.outputs.wallet == 'true'
     runs-on: macos-15
     timeout-minutes: 60
     env:
@@ -121,5 +149,47 @@ jobs:
         with:
           name: nu7-wallet-build-diagnostics
           path: ${{ runner.temp }}/nu7-artifact/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+  address-bindings:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_RELEASE_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify platform and note-export fixtures
+        run: |
+          test "$(uname -m)" = arm64
+          rustup update stable --no-self-update
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/zcash-testnet-build -p 'test_*.py'
+      - name: Test official SDK address ownership and pool binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +stable test --release --manifest-path tools/zcash-testnet-build/address-bindings/Cargo.toml 2>&1 | tee "$RUNNER_TEMP/address-binding-tests.log"
+          cargo +stable build --release --locked --manifest-path tools/zcash-testnet-build/address-bindings/Cargo.toml 2>&1 | tee "$RUNNER_TEMP/address-binding-build.log"
+      - name: Package verified helper
+        run: |
+          mkdir "$RUNNER_TEMP/address-binding-artifact"
+          cp tools/zcash-testnet-build/address-bindings/target/release/sealed-address-bindings "$RUNNER_TEMP/address-binding-artifact/"
+          cp tools/zcash-testnet-build/address-bindings/Cargo.lock "$RUNNER_TEMP/address-binding-artifact/"
+          cd "$RUNNER_TEMP/address-binding-artifact"
+          shasum -a 256 sealed-address-bindings Cargo.lock > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sealed-address-bindings-macos-arm64
+          path: ${{ runner.temp }}/address-binding-artifact/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload helper diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: address-binding-diagnostics
+          path: ${{ runner.temp }}/address-binding-*.log
           if-no-files-found: ignore
           retention-days: 7
