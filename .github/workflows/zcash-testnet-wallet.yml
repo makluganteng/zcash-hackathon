@@ -152,7 +152,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
   address-bindings:
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 30
     env:
       CARGO_INCREMENTAL: '0'
@@ -163,7 +163,7 @@ jobs:
           persist-credentials: false
       - name: Verify platform and note-export fixtures
         run: |
-          test "$(uname -m)" = arm64
+          test "$(uname -m)" = x86_64
           rustup update stable --no-self-update
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/zcash-testnet-build -p 'test_*.py'
       - name: Test official SDK address ownership and pool binding
@@ -181,7 +181,7 @@ jobs:
           shasum -a 256 sealed-address-bindings Cargo.lock > SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
-          name: sealed-address-bindings-macos-arm64
+          name: sealed-address-bindings-macos-x86_64
           path: ${{ runner.temp }}/address-binding-artifact/*
           if-no-files-found: error
           retention-days: 7
