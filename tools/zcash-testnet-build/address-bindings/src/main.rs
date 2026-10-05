@@ -29,12 +29,13 @@ fn owned_destination(uivk: &UnifiedIncomingViewingKey, encoded: &str) -> Result<
     ensure!(target.orchard().is_some() || target.sapling().is_some(), "No shielded receiver");
     let requirement = |present| if present { ReceiverRequirement::Require } else { ReceiverRequirement::Omit };
     let request = UnifiedAddressRequest::custom(requirement(target.orchard().is_some()),
-        requirement(target.sapling().is_some()), requirement(target.transparent().is_some()))?;
+        requirement(target.sapling().is_some()), requirement(target.transparent().is_some()))
+        .map_err(|_| anyhow!("Unsupported receiver requirements"))?;
     for index in uivk.decrypt_diversifiers(&target) {
         if let Ok(derived) = uivk.address(index, request) {
             if derived.orchard() == target.orchard() && derived.sapling() == target.sapling()
                 && derived.transparent() == target.transparent() {
-                return Ok(target);
+                return Ok(*target);
             }
         }
     }
@@ -108,13 +109,13 @@ mod tests {
         let k=key(7);
         let a=k.address(zip32::DiversifierIndex::from(0u32), UnifiedAddressRequest::ORCHARD).unwrap();
         let b=k.address(zip32::DiversifierIndex::from(1u32), UnifiedAddressRequest::ORCHARD).unwrap();
-        assert!(matching_pools(&a,&Address::Unified(b)).is_empty());
+        assert!(matching_pools(&a,&Address::Unified(Box::new(b))).is_empty());
     }
     #[test]
     fn orchard_binding_never_authorizes_a_sapling_output() {
         let k=key(7); let (all,_)=k.default_address(UnifiedAddressRequest::AllAvailableKeys).unwrap();
         let orchard=UnifiedAddress::from_receivers(all.orchard().cloned(),None,None,None,None).unwrap();
-        assert_eq!(matching_pools(&orchard,&Address::Unified(all)),vec!["orchard","ironwood"]);
+        assert_eq!(matching_pools(&orchard,&Address::Unified(Box::new(all))),vec!["orchard","ironwood"]);
     }
     #[test]
     fn internal_receiver_does_not_belong_to_external_viewing_key() {
@@ -135,7 +136,7 @@ mod tests {
         assert!(legacy.starts_with("utest1"));
         let target=owned_destination(&k,&legacy).unwrap();
         assert_eq!(target.orchard(),ua.orchard());
-        assert_eq!(matching_pools(&target,&Address::Unified(ua)),vec!["orchard","ironwood"]);
+        assert_eq!(matching_pools(&target,&Address::Unified(Box::new(ua))),vec!["orchard","ironwood"]);
     }
     #[test]
     fn foreign_receiver_cannot_hide_behind_an_owned_receiver() {
