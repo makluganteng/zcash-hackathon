@@ -59,6 +59,10 @@ for file in files:
     s = file.read_text()
     s = s.replace('use rand::rngs::OsRng;', 'use crate::WalletRng;')
     s = s.replace('OsRng', 'WalletRng')
+    if file.name in ('enhance.rs', 'send.rs'):
+        s = s.replace('use crate::WalletRng;\n', '')
+    if file.name == 'init_fvk.rs':
+        s = s.replace('|(network, ufvk)|', '|(network, _revision, ufvk)|')
     s = s.replace('SystemClock, WalletRng)?', 'SystemClock, crate::wallet_rng())?')
     s = s.replace('use zcash_client_sqlite::util::SystemClock;', 'use zcash_client_backend::util::SystemClock;')
     s = s.replace('use zcash_client_sqlite::{WalletDb, util::SystemClock};',
