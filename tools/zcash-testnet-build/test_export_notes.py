@@ -53,9 +53,27 @@ class NoteSnapshotTests(unittest.TestCase):
         self.db.execute('DELETE FROM v_received_outputs')
         self.assertEqual(self.read()['receivingAddresses'], ['utest1fixture'])
 
-    def test_missing_address_remains_unmatchable(self):
+    def test_missing_incoming_address_rejects_the_snapshot(self):
         self.db.execute('UPDATE v_received_outputs SET address_id=NULL')
-        self.assertNotIn('address',self.read()['transactions'][0]['outputs'][0])
+        with self.assertRaisesRegex(ValueError, 'recipient binding'):
+            self.read()
+
+    def test_unresolved_second_note_cannot_hide_behind_a_valid_payment(self):
+        self.db.execute('INSERT INTO v_received_outputs VALUES(1,1,NULL,4,8,500000,?,0,NULL)', (b'invoice-123',))
+        with self.assertRaisesRegex(ValueError, 'recipient binding'):
+            self.read()
+
+    def test_unknown_incoming_scope_is_not_an_internal_transfer(self):
+        for scope in (None, 2):
+            self.db.execute('UPDATE addresses SET key_scope=?', (scope,))
+            with self.assertRaisesRegex(ValueError, 'recipient binding'):
+                self.read()
+
+    def test_explicit_change_remains_internal_without_an_external_address(self):
+        self.db.execute('UPDATE v_received_outputs SET address_id=NULL,is_change=1')
+        out = self.read()['transactions'][0]['outputs'][0]
+        self.assertTrue(out['walletInternal'])
+        self.assertNotIn('address', out)
 
     def test_internal_and_sent_notes_are_marked(self):
         self.db.execute('UPDATE addresses SET key_scope=1')

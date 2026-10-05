@@ -67,6 +67,11 @@ def snapshot(db, config, required_height):
             raise ValueError('Mined note has no verified scanned block')
         if row['value'] < 0 or row['value'] > 2_100_000_000_000_000:
             raise ValueError('Received-note value outside Zcash money range')
+        if row['sent_note_id'] is None and not row['is_change'] and (
+                row['key_scope'] not in (0, 1) or row['address'] is None):
+            # An unresolved incoming note may be a second payment for an invoice.
+            # Do not hide it as an internal transfer or confirm a partial history.
+            raise ValueError('Incoming note has no verified recipient binding')
         expired = height is None and row['expiry_height'] not in (None, 0) and row['expiry_height'] <= tip
         tx = transactions.setdefault(txid, {
             'txid': txid, 'confirmations': tip-height+1 if height is not None else 0,
@@ -80,10 +85,10 @@ def snapshot(db, config, required_height):
             'output' if row['pool'] == 2 else 'action': row['output_index'],
             'account_uuid': account,
             'outgoing': row['sent_note_id'] is not None,
-            'walletInternal': bool(row['is_change']) or row['key_scope'] != 0,
+            'walletInternal': bool(row['is_change']) or row['key_scope'] == 1,
             'valueZat': row['value'],
         }
-        # Unknown recipient binding stays absent and cannot match an invoice.
+        # Internal change/outgoing records may legitimately omit an external address.
         if row['address'] is not None:
             output['address'] = row['address']
         memo = row['memo']

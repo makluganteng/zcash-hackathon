@@ -29,8 +29,10 @@ with its real pool and output/action index; no amount aggregation or fabricated
 recipient data. Spent received notes are retained by querying the upstream
 received-output view rather than an unspent list.
 
-Ten isolated SQLite fixture tests cover identity, memo, amount, recipient,
-multiple outputs, reorgs and failure conditions. Those fixtures are not live
+Thirteen isolated SQLite fixture tests cover identity, memo, amount, recipient,
+multiple outputs, reorgs and failure conditions. Unresolved incoming recipients
+reject the entire snapshot, including an unresolved second note beside an otherwise
+valid payment; missing scope is never treated as proof of an internal transfer. Those fixtures are not live
 payment evidence. CI also exercises a real freshly generated UFVK-only wallet
 with no funds; those checks do not replace a funded local test before enabling
 payments. Current live evidence is recorded in `docs/zcash-testnet.md`.
